@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SPYWORDS — AI Strategy Game</title>
+    <meta name="description" content="An AI-powered Codenames-style strategy game using word-embedding vectors.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+    <!-- TURN TRANSITION BAR -->
+    <div class="turn-banner" id="turn-banner"></div>
+
+    <!-- TOAST CONTAINER -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- CONFETTI CONTAINER -->
+    <div class="confetti-container" id="confetti-container"></div>
+
+    <!-- CLUE POP-OUT OVERLAY -->
+    <div class="clue-popout" id="clue-popout">
+        <div class="clue-popout-inner">
+            <div class="clue-popout-label">AI CLUE</div>
+            <div class="clue-popout-word" id="clue-popout-word">—</div>
+            <div class="clue-popout-number" id="clue-popout-number">0</div>
+        </div>
+    </div>
+
+    <!-- LOADING OVERLAY -->
+    <div id="loading-overlay" class="overlay active">
+        <div class="loader-content">
+            <div class="loader-icon">🕵️</div>
+            <h2>SPYWORDS</h2>
+            <p class="loader-sub">Setting up the board...</p>
+        </div>
+    </div>
+
+    <!-- GAME OVER MODAL -->
+    <div id="game-over-modal" class="overlay">
+        <div class="modal-box">
+            <div class="icon" id="modal-icon">🏆</div>
+            <h2 id="modal-title">GAME OVER</h2>
+            <div class="final-score" id="final-score">
+                <div class="final-score-item">
+                    <div class="fs-num" style="color: var(--red-light)" id="fs-red">0</div>
+                    <div class="fs-label">RED</div>
+                </div>
+                <div class="final-score-item">
+                    <div class="fs-num" style="color: var(--blue-light)" id="fs-blue">0</div>
+                    <div class="fs-label">BLUE</div>
+                </div>
+            </div>
+            <p id="modal-message">Red Team Wins!</p>
+            <button class="btn-action primary" onclick="game.newGame()">🔄 NEW MISSION</button>
+        </div>
+    </div>
+
+    <!-- AI ANALYSIS MODAL -->
+    <div class="analysis-overlay" id="analysis-overlay">
+        <div class="analysis-modal">
+            <h3>
+                📊 AI STRATEGY ANALYSIS
+                <button class="analysis-close" onclick="game.closeAnalysis()">✕</button>
+            </h3>
+            <div class="analysis-card wide" style="margin-bottom: 14px;">
+                <h4>🧠 AI Reasoning</h4>
+                <p id="ai-explanation">Generate a clue to see the AI's reasoning...</p>
+            </div>
+            <div class="analysis-grid">
+                <div class="analysis-card">
+                    <h4>🎯 Similarity to Clue</h4>
+                    <canvas id="similarity-chart"></canvas>
+                </div>
+                <div class="analysis-card">
+                    <h4>🏆 Top 5 Candidates</h4>
+                    <canvas id="candidates-chart"></canvas>
+                </div>
+                <div class="analysis-card wide">
+                    <h4>🗺️ Word Vector Space (2D PCA)</h4>
+                    <canvas id="vector-chart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════ -->
+    <!-- MAIN GAME                              -->
+    <!-- ══════════════════════════════════════ -->
+    <div class="game-wrapper">
+
+        <!-- LEFT PANEL: RED TEAM -->
+        <aside class="side-panel left-panel" id="left-panel">
+            <div class="team-header red">
+                <span class="team-dot red"></span>
+                RED TEAM
+            </div>
+            <div class="panel-section">
+                <div class="score-display">
+                    <span class="big-score" id="red-score">0</span>
+                    <span class="score-sub">/ <span id="red-total">9</span> FOUND</span>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar-fill" id="red-progress" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="panel-section">
+                <div class="role-badge">🤖 AI Spymaster</div>
+                <div class="role-badge player">🧑 You — Operative</div>
+            </div>
+        </aside>
+
+        <!-- CENTER: BOARD + CONTROLS -->
+        <main class="center-area">
+
+            <!-- TOP BAR -->
+            <div class="top-bar">
+                <div class="game-title">
+                    <span class="logo">🕵️‍♂️</span>
+                    <h1>SPYWORDS</h1>
+                </div>
+                <div id="turn-badge" class="turn-badge red-turn">
+                    <span class="pulse-dot"></span>
+                    <span id="turn-text">RED — SPYMASTER</span>
+                </div>
+                <div class="top-controls">
+                    <select id="difficulty-select">
+                        <option value="easy">EASY</option>
+                        <option value="medium" selected>MEDIUM</option>
+                        <option value="hard">HARD</option>
+                    </select>
+                    <button class="btn-sm outline" id="spy-view-btn" onclick="game.toggleSpymasterView()">👁️ SPY VIEW</button>
+                    <button class="btn-sm outline" id="analysis-btn" onclick="game.openAnalysis()">📊</button>
+                    <button class="btn-sm outline" onclick="game.newGame()">NEW GAME</button>
+                </div>
+            </div>
+
+            <!-- 5×5 BOARD -->
+            <div class="game-board" id="game-board">
+                <!-- 25 cards rendered by JS -->
+            </div>
+
+            <!-- ACTION BAR -->
+            <div class="action-bar">
+                <div class="clue-display">
+                    <span class="clue-tag">AI CLUE</span>
+                    <span class="clue-word" id="clue-word">—</span>
+                    <span class="clue-num" id="clue-num" style="display:none"></span>
+                    <span class="guesses-left" id="guesses-left">Waiting for clue...</span>
+                </div>
+                <div class="action-buttons">
+                    <button class="btn-action primary" id="get-clue-btn" onclick="game.getClue()">
+                        🧠 GET CLUE <span class="kbd-hint">SPACE</span>
+                    </button>
+                    <button class="btn-action secondary" id="pass-btn" onclick="game.passTurn()" disabled>
+                        ⏭️ PASS <span class="kbd-hint">ESC</span>
+                    </button>
+                </div>
+            </div>
+        </main>
+
+        <!-- RIGHT PANEL: BLUE TEAM + LOG -->
+        <aside class="side-panel right-panel" id="right-panel">
+            <div class="team-header blue">
+                <span class="team-dot blue"></span>
+                BLUE TEAM
+            </div>
+            <div class="panel-section">
+                <div class="score-display">
+                    <span class="big-score" id="blue-score">0</span>
+                    <span class="score-sub">/ <span id="blue-total">8</span> FOUND</span>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar-fill" id="blue-progress" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="panel-section">
+                <div class="role-badge">🤖 AI Spymaster</div>
+            </div>
+            <div class="game-log-container">
+                <div class="log-header">GAME LOG</div>
+                <div class="game-log" id="game-log">
+                    <div class="log-empty">Press <strong>SPACE</strong> to begin...</div>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/game.js') }}"></script>
+</body>
+</html>
