@@ -52,9 +52,7 @@ def generate_clue(target_team, risk_aversion, max_words_to_connect):
     # All words currently on the board (rules dictate we can't use these as clues)
     board_set = set([word for category in st.session_state.board.values() for word in category])
     
-    best_clue = None
-    best_score = -999
-    best_connections = []
+    top_clues = []
 
     # Search the top 5,000 most common words in our AI's vocabulary
     vocab_subset = model.index_to_key[:5000]
@@ -80,14 +78,24 @@ def generate_clue(target_team, risk_aversion, max_words_to_connect):
             # Score = Reward - Penalty - (Risk Aversion * Death Risk)
             score = reward - (0.5 * penalty) - (risk_aversion * death_risk)
             
-            if score > best_score:
-                best_score = score
-                best_clue = potential_clue
-                # Find which target words this clue connects to best
-                connected = [t for t in targets if model.similarity(potential_clue, t) > 0.4]
-                best_connections = connected[:max_words_to_connect]
+            # Save the clue and its score
+            top_clues.append((score, potential_clue))
 
-    return best_clue, best_score, best_connections
+    # Sort all valid clues by their strategy score in descending order
+    top_clues.sort(key=lambda x: x[0], reverse=True)
+    
+    # Pick a random clue from the top 10 to ensure variety while keeping quality high
+    pool_size = min(10, len(top_clues))
+    if pool_size > 0:
+        best_score, best_clue = random.choice(top_clues[:pool_size])
+        
+        # Find which target words this clue connects to best
+        connected = [t for t in targets if model.similarity(best_clue, t) > 0.4]
+        best_connections = connected[:max_words_to_connect]
+        
+        return best_clue, best_score, best_connections
+        
+    return None, 0, []
 
 
 # --- 5. THE USER INTERFACE ---

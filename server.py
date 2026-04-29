@@ -12,7 +12,15 @@ import random
 import uuid
 from sklearn.decomposition import PCA
 from word_bank import WORD_BANK
-from ai_engine import WordSimilarityEngine
+import gensim.downloader as api
+import ssl
+
+try:
+    _create_unverified_https_context = ssl._create_unverified_context
+except AttributeError:
+    pass
+else:
+    ssl._create_default_https_context = _create_unverified_https_context
 
 # ──────────────────────────────────────────────────────────────
 # Flask App Setup
@@ -23,9 +31,9 @@ app.secret_key = "semantic-saboteur-2026-secret"
 # ──────────────────────────────────────────────────────────────
 # Load AI Model
 # ──────────────────────────────────────────────────────────────
-print("\n🧠 Initializing AI Similarity Engine...")
-engine = WordSimilarityEngine()
-print(f"✅ Engine ready! Vocabulary: {len(engine.index_to_key)} words\n")
+print("\n🧠 Downloading/Loading GloVe Word Vectors (this takes a minute the first time)...")
+engine = api.load("glove-wiki-gigaword-50")
+print(f"✅ AI Engine ready! Vocabulary: {len(engine.index_to_key)} words\n")
 
 # In-memory game storage
 games = {}
@@ -123,8 +131,9 @@ def generate_clue(game):
     best_connections = []
     all_candidates = []
 
-    # Search all words in vocabulary (excluding board words)
-    for potential_clue in engine.index_to_key:
+    # Search top 10000 most common words in vocabulary (excluding board words)
+    vocab_subset = engine.index_to_key[:10000]
+    for potential_clue in vocab_subset:
         if potential_clue in board_set:
             continue
         if any(potential_clue in w or w in potential_clue for w in board_set):
